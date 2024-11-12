@@ -221,8 +221,10 @@ class RobomimicReplayImageDataset(BaseImageDataset):
 
 
 def _convert_actions(raw_actions, abs_action, rotation_transformer):
-    actions = raw_actions[...,:7]
+    # actions = raw_actions[...,:7]
+    actions = raw_actions[...,:] # Soroush: changed to all action dims
     if abs_action:
+        raise NotImplementedError
         is_dual_arm = False
         if raw_actions.shape[-1] == 14:
             # dual arm

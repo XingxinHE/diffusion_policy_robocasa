@@ -323,13 +323,13 @@ class RobomimicImageRunner(BaseImageRunner):
                     env_action = self.undo_transform_action(action)
                 ac_size = list(env_action.shape)
                 ac_size[-1] = 1
-                base_ac = np.array([0, 0, 0, 0, -1])
+                # base_ac = np.array([0, 0, 0, 0, -1])
 
-                # Expand base_ac to shape (1, 8, 5) so it can be concatenated along the last axis
-                base_ac_expanded = np.tile(base_ac, ac_size)
+                # # Expand base_ac to shape (1, 8, 5) so it can be concatenated along the last axis
+                # base_ac_expanded = np.tile(base_ac, ac_size)
 
-                # Concatenate along the last axis (axis=-1)
-                env_action = np.concatenate([env_action, base_ac_expanded], axis=-1)
+                # # Concatenate along the last axis (axis=-1)
+                # env_action = np.concatenate([env_action, base_ac_expanded], axis=-1)
                 obs, reward, done, info = env.step(env_action)
                 done = np.all(done)
                 past_action = action
@@ -379,6 +379,8 @@ class RobomimicImageRunner(BaseImageRunner):
         return log_data
 
     def undo_transform_action(self, action):
+        ### WARNING: doesn't work with anything other than arm+gripper action! ###
+
         raw_shape = action.shape
         if raw_shape[-1] == 20:
             # dual arm

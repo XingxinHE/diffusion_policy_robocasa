@@ -1,4 +1,4 @@
-name: arrange_vegetables_simple_v2_human_300
+name: arrange_vegetables_simple_v2_human_500_zarr_2cams
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -15,10 +15,10 @@ shape_meta: &shape_meta
       shape: [4]
     robot0_gripper_qpos:
       shape: [2]
-  action: 
-    shape: [7]
+  action:
+    shape: [12]
 
-dataset_path: &dataset_path /data3/robocasa/datasets/v0.1/multi_stage/chopping_food/ArrangeVegetablesSimpleV2/2024-10-28/demo_300_im128.hdf5
+dataset_path: &dataset_path /data3/robocasa/datasets/v0.1/multi_stage/chopping_food/ArrangeVegetablesSimpleV2/2024-10-28/demo_500_im128.hdf5
 
 abs_action: &abs_action False
 
@@ -50,6 +50,7 @@ env_runner:
 
 dataset:
   _target_: diffusion_policy.dataset.robomimic_replay_image_dataset.RobomimicReplayImageDataset
+  # _target_: diffusion_policy.dataset.robomimic_hdf5_image_dataset.RobomimicHDF5ImageDataset
   shape_meta: *shape_meta
   dataset_path: *dataset_path
   horizon: ${horizon}
@@ -64,4 +65,4 @@ dataset:
   val_ratio: 0.02
 
 logging:
-  project: diffusion_policy_arrange_vegetables_simple_v2_human_300
+  project: diffusion_policy_arrange_vegetables_simple_v2_human_500_zarr
