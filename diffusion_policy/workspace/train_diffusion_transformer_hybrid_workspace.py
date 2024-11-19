@@ -66,6 +66,10 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
             if lastest_ckpt_path.is_file():
                 print(f"Resuming from checkpoint {lastest_ckpt_path}")
                 self.load_checkpoint(path=lastest_ckpt_path)
+        
+        if "ckpt_path" in cfg.task and cfg.task.ckpt_path is not None:
+            print(f"Initializing from checkpoint {cfg.task.ckpt_path}")
+            self.load_checkpoint(path=cfg.task.ckpt_path)
 
         # configure dataset
         dataset: BaseImageDataset
