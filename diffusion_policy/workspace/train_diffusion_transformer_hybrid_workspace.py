@@ -75,7 +75,15 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
         dataset: BaseImageDataset
         dataset = hydra.utils.instantiate(cfg.task.dataset)
         assert isinstance(dataset, BaseImageDataset)
-        train_dataloader = DataLoader(dataset, **cfg.dataloader)
+
+        dataloader_cfg = copy.deepcopy(OmegaConf.to_container(cfg.dataloader))
+        if hasattr(dataset, "get_dataset_sampler"):
+            sampler = dataset.get_dataset_sampler()
+            if sampler is not None:
+                dataloader_cfg["sampler"] = sampler
+                dataloader_cfg["shuffle"] = False
+                print("using custom dataloader sampler")
+        train_dataloader = DataLoader(dataset, **dataloader_cfg)
         normalizer = dataset.get_normalizer()
 
         # configure validation dataset

@@ -1,5 +1,6 @@
 from robomimic.utils.dataset import SequenceDataset
 from robomimic.macros import LANG_EMB_KEY
+from robomimic.utils.dataset import CustomWeightedRandomSampler, MetaDataset
 from diffusion_policy.dataset.base_dataset import BaseImageDataset
 from diffusion_policy.model.common.normalizer import LinearNormalizer, SingleFieldLinearNormalizer
 
@@ -187,3 +188,111 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             demo_keys = self.demos
         
         return np.concatenate([self.hdf5_file["data/{}/{}".format(ep, key)][()] for ep in demo_keys], axis=0)
+
+
+class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
+    """
+    Dataset class for sampling for multiple datasets for cotraining. Each dataset is a Robomimic HDF5 dataset.
+    Very similar to robomimic MetaDataset.
+    TODO: rename
+    """
+    def __init__(self,
+            shape_meta: dict,
+            dataset_paths: str,
+            horizon=1,
+            pad_before=0,
+            pad_after=0,
+            n_obs_steps=None,
+            abs_action=False,
+            rotation_rep='rotation_6d', # ignored when abs_action=False
+            use_legacy_normalizer=False,
+            use_cache=False,
+            seed=42,
+            val_ratio=0.0, # validation not implemented yet
+            # filter_key=None,
+        ):
+
+        self.datasets = [
+                RobomimicHDF5ImageDataset(
+                shape_meta=shape_meta,
+                dataset_path=dataset_path,
+                horizon=horizon,
+                pad_before=pad_before,
+                pad_after=pad_after,
+                n_obs_steps=n_obs_steps,
+                abs_action=abs_action,
+                rotation_rep=rotation_rep,
+                use_legacy_normalizer=use_legacy_normalizer,
+                use_cache=use_cache,
+                seed=seed,
+                # dont validate on sim since we doing real world downstream!
+                val_ratio=0
+            ) for dataset_path in dataset_paths
+        ]
+        self.lowdim_keys = self.datasets[0].lowdim_keys
+        self.rgb_keys = self.datasets[0].rgb_keys
+        self.abs_action = abs_action
+        self.ds_weights = [1/len(self.datasets)]*len(self.datasets)
+        MetaDataset.__init__(self, datasets=self.datasets, ds_weights=self.ds_weights, normalize_weights_by_ds_size=True)
+
+    def get_validation_dataset(self):
+        # if val ratio is not 0, then use the real dataset for validation since that is our downstream setting
+        return self.datasets[0].get_validation_dataset()
+
+    def get_normalizer(self, **kwargs) -> LinearNormalizer:
+
+        # Aggregate data from all datasets and normalize together
+        normalizer = LinearNormalizer()
+
+        # action
+        stat = array_to_stats(np.concatenate([ds.get_all_actions().astype(np.float32) for ds in self.datasets], axis=0))
+        if self.abs_action:
+            if stat['mean'].shape[-1] > 10:
+                # dual arm
+                this_normalizer = robomimic_abs_action_only_dual_arm_normalizer_from_stat(stat)
+            else:
+                this_normalizer = robomimic_abs_action_only_normalizer_from_stat(stat)
+
+            if self.use_legacy_normalizer:
+                this_normalizer = normalizer_from_stat(stat)
+        else:
+            # already normalized
+            this_normalizer = get_identity_normalizer_from_stat(stat)
+        normalizer['action'] = this_normalizer
+
+        # obs
+        for key in self.lowdim_keys:
+            stat = array_to_stats(np.concatenate([ds._get_all_data("obs/" + key).astype(np.float32) for ds in self.datasets], axis=0))
+
+            if key.endswith('pos'):
+                this_normalizer = get_range_normalizer_from_stat(stat)
+            elif key.endswith('quat'):
+                # quaternion is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('qpos'):
+                this_normalizer = get_range_normalizer_from_stat(stat)
+            elif key == LANG_EMB_KEY:
+                # don't normalize language embeddings
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            else:
+                raise RuntimeError('unsupported')
+            normalizer[key] = this_normalizer
+
+        # image
+        for key in self.rgb_keys:
+            normalizer[key] = get_image_range_normalizer()
+        return normalizer
+
+    def get_all_actions(self) -> torch.Tensor:
+        return torch.cat([ds.get_all_actions() for ds in self.datasets], dim=0)
+
+
+def normalizer_from_stat(stat):
+    max_abs = np.maximum(stat['max'].max(), np.abs(stat['min']).max())
+    scale = np.full_like(stat['max'], fill_value=1/max_abs)
+    offset = np.zeros_like(stat['max'])
+    return SingleFieldLinearNormalizer.create_manual(
+        scale=scale,
+        offset=offset,
+        input_stats_dict=stat
+    )
