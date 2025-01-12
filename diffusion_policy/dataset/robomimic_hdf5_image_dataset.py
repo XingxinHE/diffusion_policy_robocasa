@@ -44,6 +44,7 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             seed=42,
             val_ratio=0.0, # validation not implemented yet
             filter_key=None,
+            action_keys=('actions',),
         ):
 
         assert not abs_action, "abs_action not supported"
@@ -56,11 +57,57 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
         # convert horizon and n_obs_steps to frame_stack and seq_length
         frame_stack = n_obs_steps
         seq_length = horizon - frame_stack + 1
-        action_keys = ['actions'] if not abs_action else ["actions_abs"]
         dataset_keys = action_keys
 
-        # normalization will be done outside in the dp codebase, so turn off normalization in sequence dataset
         action_config = {action_keys[0]: {'normalization': None}}
+        action_config.update({
+            "actions":{
+                "normalization": None,
+            },
+            "actions_abs":{
+                "normalization": "min_max",
+            },
+            "action_dict/right_gripper": {
+                "normalization": None,
+            },
+            "action_dict/right_joint_abs": {
+                "normalization": "min_max",
+            },
+            "action_dict/base": {
+                "normalization": None,
+            },
+            "action_dict/torso": {
+                "normalization": None,
+            },
+            "action_dict/abs_pos": {
+                "normalization": "min_max"
+            },
+            "action_dict/abs_rot_axis_angle": {
+                "normalization": "min_max",
+                "format": "rot_axis_angle"
+            },
+            "action_dict/abs_rot_6d": {
+                "normalization": None,
+                "format": "rot_6d"
+            },
+            "action_dict/rel_pos": {
+                "normalization": None,
+            },
+            "action_dict/rel_rot_axis_angle": {
+                "normalization": None,
+                "format": "rot_axis_angle"
+            },
+            "action_dict/rel_rot_6d": {
+                "normalization": None,
+                "format": "rot_6d"
+            },
+            "action_dict/gripper": {
+                "normalization": None,
+            },
+            "action_dict/base_mode": {
+                "normalization": None,
+            },
+        })
         hdf5_normalize_obs = False
 
         # assert pad_before and pad_after equal to nobs and action length
@@ -78,6 +125,7 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             load_next_obs=False,
             hdf5_normalize_obs=hdf5_normalize_obs,
             filter_by_attribute=filter_key,
+            normalize_actions=False, # don't normalize actions in dataset (will be normalized by diffusion policy model later)
         )
 
         rgb_keys = list()
@@ -133,20 +181,28 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
         normalizer = LinearNormalizer()
 
         # action
-        stat = array_to_stats(self._get_all_data(self.action_key).astype(np.float32))
-        if self.abs_action:
-            if stat['mean'].shape[-1] > 10:
-                # dual arm
-                this_normalizer = robomimic_abs_action_only_dual_arm_normalizer_from_stat(stat)
-            else:
-                this_normalizer = robomimic_abs_action_only_normalizer_from_stat(stat)
+        # stat = array_to_stats(self._get_all_data(self.action_key).astype(np.float32))
+        # if self.abs_action:
+        #     if stat['mean'].shape[-1] > 10:
+        #         # dual arm
+        #         this_normalizer = robomimic_abs_action_only_dual_arm_normalizer_from_stat(stat)
+        #     else:
+        #         this_normalizer = robomimic_abs_action_only_normalizer_from_stat(stat)
             
-            if self.use_legacy_normalizer:
-                this_normalizer = normalizer_from_stat(stat)
-        else:
-            # already normalized
-            this_normalizer = get_identity_normalizer_from_stat(stat)
-        normalizer['action'] = this_normalizer
+        #     if self.use_legacy_normalizer:
+        #         this_normalizer = normalizer_from_stat(stat)
+        # else:
+        #     # already normalized
+        #     this_normalizer = get_identity_normalizer_from_stat(stat)
+        # normalizer['action'] = this_normalizer
+        action_normalization_stats = self.get_action_normalization_stats()
+        scale = np.concatenate([action_normalization_stats[ac_key]["scale"][0] for ac_key in self.action_keys])
+        offset = np.concatenate([action_normalization_stats[ac_key]["offset"][0] for ac_key in self.action_keys])
+        normalizer['action'] = SingleFieldLinearNormalizer.create_manual(
+            scale=scale,
+            offset=offset,
+            input_stats_dict={}, #stat
+        )
 
         # obs
         for key in self.lowdim_keys:
@@ -161,6 +217,12 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
                 this_normalizer = get_range_normalizer_from_stat(stat)
             elif key == LANG_EMB_KEY:
                 # don't normalize language embeddings
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('sin'):
+                # sin is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('cos'):
+                # sin is in [-1,1] already
                 this_normalizer = get_identity_normalizer_from_stat(stat)
             else:
                 raise RuntimeError('unsupported')
@@ -210,6 +272,7 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
             seed=42,
             val_ratio=0.0, # validation not implemented yet
             # filter_key=None,
+            action_keys=('actions',), # assumes that all datasets in the cotraining mixture use the same action keys
         ):
 
         self.datasets = [
@@ -226,13 +289,15 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
                 use_cache=use_cache,
                 seed=seed,
                 # dont validate on sim since we doing real world downstream!
-                val_ratio=0
+                val_ratio=0,
+                action_keys=action_keys,
             ) for dataset_path in dataset_paths
         ]
         self.lowdim_keys = self.datasets[0].lowdim_keys
         self.rgb_keys = self.datasets[0].rgb_keys
         self.abs_action = abs_action
         self.ds_weights = [1/len(self.datasets)]*len(self.datasets)
+        self.action_keys = action_keys
         MetaDataset.__init__(self, datasets=self.datasets, ds_weights=self.ds_weights, normalize_weights_by_ds_size=True)
 
     def get_validation_dataset(self):
@@ -245,20 +310,28 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
         normalizer = LinearNormalizer()
 
         # action
-        stat = array_to_stats(np.concatenate([ds.get_all_actions().astype(np.float32) for ds in self.datasets], axis=0))
-        if self.abs_action:
-            if stat['mean'].shape[-1] > 10:
-                # dual arm
-                this_normalizer = robomimic_abs_action_only_dual_arm_normalizer_from_stat(stat)
-            else:
-                this_normalizer = robomimic_abs_action_only_normalizer_from_stat(stat)
+        # stat = array_to_stats(np.concatenate([ds.get_all_actions().astype(np.float32) for ds in self.datasets], axis=0))
+        # if self.abs_action:
+        #     if stat['mean'].shape[-1] > 10:
+        #         # dual arm
+        #         this_normalizer = robomimic_abs_action_only_dual_arm_normalizer_from_stat(stat)
+        #     else:
+        #         this_normalizer = robomimic_abs_action_only_normalizer_from_stat(stat)
 
-            if self.use_legacy_normalizer:
-                this_normalizer = normalizer_from_stat(stat)
-        else:
-            # already normalized
-            this_normalizer = get_identity_normalizer_from_stat(stat)
-        normalizer['action'] = this_normalizer
+        #     if self.use_legacy_normalizer:
+        #         this_normalizer = normalizer_from_stat(stat)
+        # else:
+        #     # already normalized
+        #     this_normalizer = get_identity_normalizer_from_stat(stat)
+        # normalizer['action'] = this_normalizer
+        action_normalization_stats = self.get_action_normalization_stats()
+        scale = np.concatenate([action_normalization_stats[ac_key]["scale"][0] for ac_key in self.action_keys])
+        offset = np.concatenate([action_normalization_stats[ac_key]["offset"][0] for ac_key in self.action_keys])
+        normalizer['action'] = SingleFieldLinearNormalizer.create_manual(
+            scale=scale,
+            offset=offset,
+            input_stats_dict={}, #stat
+        )
 
         # obs
         for key in self.lowdim_keys:

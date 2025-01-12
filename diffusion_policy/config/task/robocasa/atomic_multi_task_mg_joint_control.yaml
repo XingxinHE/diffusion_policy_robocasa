@@ -1,4 +1,4 @@
-name: atomic_multi_task_mg
+name: atomic_multi_task_mg_joint_control
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -21,7 +21,7 @@ shape_meta: &shape_meta
     lang_emb:
       shape: [768]
   action: 
-    shape: [12]
+    shape: [13]
 
 dataset_paths: &dataset_paths [
   '/mnt/nfs_client/robocasa/datasets/v0.1/single_stage/kitchen_pnp/PnPCounterToSink/mg/2024-05-04-22-14-06_and_2024-05-07-07-40-17/demo_gentex_im128_randcams.hdf5',
@@ -86,6 +86,24 @@ env_runner:
     # style_ids: None,
     # layout_ids: None,
     # layout_and_style_ids: [[1, 1], [2, 2], [4, 4], [6, 9], [7, 10]],
+
+    controller_configs:
+      type: "HYBRID_MOBILE_BASE"
+      body_parts:
+        right:
+          type: "JOINT_POSITION"
+          kp: 150
+          interpolation: null
+          input_type": "absolute"
+          gripper:
+            type: "GRIP"
+        torso:
+          type: "JOINT_POSITION"
+          interpolation: "null"
+          kp: 2000
+        base:
+          type: "JOINT_VELOCITY"
+          interpolation: "null"
 # evaluation at this config requires a 16 core 64GB instance.
 
 dataset:
@@ -93,7 +111,7 @@ dataset:
   _target_: diffusion_policy.dataset.robomimic_hdf5_image_dataset.RobomimicCotrainingHDF5ImageDataset
   shape_meta: *shape_meta
   dataset_paths: *dataset_paths
-  action_keys: ['action_dict/right_ee_pos_delta', 'action_dict/right_ee_ori_delta', 'action_dict/base', 'action_dict/torso', 'action_dict/base_mode']
+  action_keys: ['action_dict/right_joint_abs', 'action_dict/right_gripper', 'action_dict/base', 'action_dict/torso', 'action_dict/base_mode']
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
   pad_after: ${eval:'${n_action_steps}-1'}

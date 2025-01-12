@@ -21,7 +21,8 @@ shape_meta: &shape_meta
   action: 
     shape: [12]
 
-dataset_path: &dataset_path /data3/aaronl/tmp_mg_folder/2024-11-14-20-55-29/2024-11-14-20-55-29/demo_im128.hdf5
+# dataset_path: &dataset_path /data3/aaronl/tmp_mg_folder/2024-11-14-20-55-29/2024-11-14-20-55-29/demo_im128.hdf5
+dataset_path: &dataset_path /mnt/nfs_client/robocasa/datasets/v0.1/multi_stage/washing_dishes/PreSoakPan/mg/2024-11-14-20-55-29/demo_im128.hdf5
 
 abs_action: &abs_action False
 

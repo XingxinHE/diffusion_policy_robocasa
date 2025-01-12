@@ -22,15 +22,15 @@ shape_meta: &shape_meta
     shape: [12]
 
 dataset_paths: &dataset_paths [
-  '/data1/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5',
-  '/data1/aaronl/expdata/mg/2024-11-19-08-36-50/demo_im128.hdf5',
+  '/mnt/nfs_client/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5',
+  '/mnt/nfs_client/aaronl/expdata/mg/2024-11-19-08-36-50/demo_im128.hdf5',
 ]
 
 abs_action: &abs_action False
 
 env_runner:
   _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: /data1/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5
+  dataset_path: /mnt/nfs_client/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5
   shape_meta: *shape_meta
   # costs 1GB per env
   n_train: 1
@@ -59,7 +59,7 @@ dataset:
   # _target_: diffusion_policy.dataset.robomimic_replay_image_dataset.RobomimicReplayImageDataset
   _target_: diffusion_policy.dataset.robomimic_hdf5_image_dataset.RobomimicHDF5ImageDataset
   shape_meta: *shape_meta
-  dataset_path: /data1/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5
+  dataset_path: /mnt/nfs_client/aaronl/expdata/mg/2024-11-21-06-50-27/demo_im128.hdf5
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
   pad_after: ${eval:'${n_action_steps}-1'}

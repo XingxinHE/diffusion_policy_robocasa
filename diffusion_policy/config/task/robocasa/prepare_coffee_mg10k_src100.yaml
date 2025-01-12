@@ -21,7 +21,7 @@ shape_meta: &shape_meta
   action: 
     shape: [12]
 
-dataset_path: &dataset_path /data1/aaronl/expdata/mg/2024-11-24-02-44-17/demo_im128.hdf5
+dataset_path: &dataset_path /mnt/nfs_client/robocasa/datasets/v0.1/multi_stage/brewing/PrepareCoffee/mg/2024-11-24-02-44-17/demo_im128.hdf5
 
 abs_action: &abs_action False
 
