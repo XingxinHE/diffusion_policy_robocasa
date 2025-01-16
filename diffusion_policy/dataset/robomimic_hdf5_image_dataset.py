@@ -70,6 +70,12 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             "action_dict/right_gripper": {
                 "normalization": None,
             },
+            "action_dict/right_ee_pos_delta": {
+                "normalization": None,
+            },
+            "action_dict/right_ee_ori_delta": {
+                "normalization": None,
+            },
             "action_dict/right_joint_abs": {
                 "normalization": "min_max",
             },
@@ -346,6 +352,12 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
                 this_normalizer = get_range_normalizer_from_stat(stat)
             elif key == LANG_EMB_KEY:
                 # don't normalize language embeddings
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('sin'):
+                # sin is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('cos'):
+                # sin is in [-1,1] already
                 this_normalizer = get_identity_normalizer_from_stat(stat)
             else:
                 raise RuntimeError('unsupported')

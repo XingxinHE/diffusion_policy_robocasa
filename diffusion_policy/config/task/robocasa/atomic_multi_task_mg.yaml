@@ -93,7 +93,7 @@ dataset:
   _target_: diffusion_policy.dataset.robomimic_hdf5_image_dataset.RobomimicCotrainingHDF5ImageDataset
   shape_meta: *shape_meta
   dataset_paths: *dataset_paths
-  action_keys: ['action_dict/right_ee_pos_delta', 'action_dict/right_ee_ori_delta', 'action_dict/base', 'action_dict/torso', 'action_dict/base_mode']
+  action_keys: ['action_dict/right_ee_pos_delta', 'action_dict/right_ee_ori_delta', 'action_dict/right_gripper', 'action_dict/base', 'action_dict/torso', 'action_dict/base_mode']
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
   pad_after: ${eval:'${n_action_steps}-1'}
