@@ -7,6 +7,9 @@ from diffusion_policy.model.common.normalizer import LinearNormalizer, SingleFie
 from threadpoolctl import threadpool_limits
 from diffusion_policy.common.pytorch_util import dict_apply
 
+import robomimic.utils.torch_utils as TorchUtils
+import robomimic.utils.lang_utils as LangUtils
+
 import torch
 import numpy as np
 from typing import Dict, List
@@ -45,6 +48,8 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             val_ratio=0.0, # validation not implemented yet
             filter_key=None,
             action_keys=('actions',),
+            lang_encoder=None,
+            del_lang_encoder_after_init=False,
         ):
 
         assert not abs_action, "abs_action not supported"
@@ -132,6 +137,8 @@ class RobomimicHDF5ImageDataset(SequenceDataset,BaseImageDataset):
             hdf5_normalize_obs=hdf5_normalize_obs,
             filter_by_attribute=filter_key,
             normalize_actions=False, # don't normalize actions in dataset (will be normalized by diffusion policy model later)
+            lang_encoder=lang_encoder,
+            del_lang_encoder_after_init=del_lang_encoder_after_init,
         )
 
         rgb_keys = list()
@@ -277,9 +284,16 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
             use_cache=False,
             seed=42,
             val_ratio=0.0, # validation not implemented yet
-            # filter_key=None,
+            filter_key=None,
             action_keys=('actions',), # assumes that all datasets in the cotraining mixture use the same action keys
+            normalize_weights_by_ds_size=False,
         ):
+
+        # get the language encoder once
+        device = TorchUtils.get_torch_device(try_to_use_cuda=True)
+        lang_encoder = LangUtils.LangEncoder(
+            device=device,
+        )
 
         self.datasets = [
                 RobomimicHDF5ImageDataset(
@@ -297,14 +311,20 @@ class RobomimicCotrainingHDF5ImageDataset(MetaDataset, BaseImageDataset):
                 # dont validate on sim since we doing real world downstream!
                 val_ratio=0,
                 action_keys=action_keys,
+                filter_key=filter_key,
+                lang_encoder=lang_encoder,
+                del_lang_encoder_after_init=False,
             ) for dataset_path in dataset_paths
         ]
+        
+        del lang_encoder # delete the language encoder when done
+
         self.lowdim_keys = self.datasets[0].lowdim_keys
         self.rgb_keys = self.datasets[0].rgb_keys
         self.abs_action = abs_action
         self.ds_weights = [1/len(self.datasets)]*len(self.datasets)
         self.action_keys = action_keys
-        MetaDataset.__init__(self, datasets=self.datasets, ds_weights=self.ds_weights, normalize_weights_by_ds_size=True)
+        MetaDataset.__init__(self, datasets=self.datasets, ds_weights=self.ds_weights, normalize_weights_by_ds_size=normalize_weights_by_ds_size)
 
     def get_validation_dataset(self):
         # if val ratio is not 0, then use the real dataset for validation since that is our downstream setting

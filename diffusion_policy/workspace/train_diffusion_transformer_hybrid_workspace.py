@@ -32,6 +32,12 @@ from diffusion_policy.model.common.lr_scheduler import get_scheduler
 from accelerate import Accelerator
 from accelerate import DistributedDataParallelKwargs
 from accelerate.utils import broadcast_object_list
+from accelerate.utils import InitProcessGroupKwargs
+from datetime import timedelta
+
+# hide wandb warnings
+import logging
+logging.getLogger("wandb").setLevel(logging.ERROR)
 
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
@@ -64,9 +70,10 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
 
     def run(self):
         ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+        timeout_handler = InitProcessGroupKwargs(timeout=timedelta(hours=3)) # have processes wait up to 3 hours for evals to finish
         cfg = copy.deepcopy(self.cfg)
         # set split_batches=True so that effective batch size stays the same regardless of num GPUs
-        accelerator = Accelerator(log_with='wandb', kwargs_handlers=[ddp_kwargs], split_batches=True)
+        accelerator = Accelerator(log_with='wandb', kwargs_handlers=[ddp_kwargs, timeout_handler], split_batches=True)
 
         wandb_cfg = OmegaConf.to_container(cfg.logging, resolve=True)
 
@@ -77,6 +84,17 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
             config=OmegaConf.to_container(cfg, resolve=True),
             init_kwargs={"wandb": wandb_cfg}
         )
+
+        # wandb_run = wandb.init(
+        #     dir=str(self.output_dir),
+        #     config=OmegaConf.to_container(cfg, resolve=True),
+        #     **cfg.logging
+        # )
+        # wandb.config.update(
+        #     {
+        #         "output_dir": self.output_dir,
+        #     }
+        # )
 
         if accelerator.is_main_process:
             data_to_share = self.output_dir
@@ -181,6 +199,7 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
         train_dataloader, val_dataloader, self.model, self.optimizer, lr_scheduler = accelerator.prepare(
             train_dataloader, val_dataloader, self.model, self.optimizer, lr_scheduler
         )
+        train_dataloader_iter = iter(train_dataloader)
         device = self.model.device
         if self.ema_model is not None:
             self.ema_model.to(device)
@@ -205,54 +224,63 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
                 step_log = dict()
                 # ========= train for this epoch ==========
                 train_losses = list()
-                max_train_steps = cfg.training.max_train_steps
-                tqdm_kwargs = {}
-                if max_train_steps is not None:
-                    tqdm_kwargs["total"] = max_train_steps
-                with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}", 
-                        leave=False, mininterval=cfg.training.tqdm_interval_sec, **tqdm_kwargs) as tepoch:
-                    for batch_idx, batch in enumerate(tepoch):
-                        # device transfer
-                        batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
-                        if train_sampling_batch is None:
-                            train_sampling_batch = batch
+                # max_train_steps = cfg.training.max_train_steps
+                # tqdm_kwargs = {}
+                # if max_train_steps is not None:
+                #     tqdm_kwargs["total"] = max_train_steps
+                # with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}", 
+                #         leave=False, mininterval=cfg.training.tqdm_interval_sec, **tqdm_kwargs) as tepoch:
+                #     for batch_idx, batch in enumerate(tepoch):
 
-                        # compute loss
-                        raw_loss = self.model(batch)
-                        loss = raw_loss / cfg.training.gradient_accumulate_every
-                        loss.backward()
+                assert cfg.training.max_train_steps is not None
+                for batch_idx in tqdm.tqdm(range(cfg.training.max_train_steps), desc=f"Training epoch {self.epoch}", leave=False, mininterval=cfg.training.tqdm_interval_sec):
+                    try:
+                        batch = next(train_dataloader_iter)
+                    except StopIteration:
+                        # reset for next dataset pass
+                        train_dataloader_iter = iter(train_dataloader)
+                        batch = next(train_dataloader_iter)
+                    # device transfer
+                    batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
+                    if train_sampling_batch is None:
+                        train_sampling_batch = batch
 
-                        # step optimizer
-                        if self.global_step % cfg.training.gradient_accumulate_every == 0:
-                            self.optimizer.step()
-                            self.optimizer.zero_grad()
-                            lr_scheduler.step()
-                        
-                        # update ema
-                        if cfg.training.use_ema:
-                            ema.step(accelerator.unwrap_model(self.model))
+                    # compute loss
+                    raw_loss = self.model(batch)
+                    loss = raw_loss / cfg.training.gradient_accumulate_every
+                    loss.backward()
 
-                        # logging
-                        raw_loss_cpu = raw_loss.item()
-                        tepoch.set_postfix(loss=raw_loss_cpu, refresh=False)
-                        train_losses.append(raw_loss_cpu)
-                        step_log = {
-                            'train_loss': raw_loss_cpu,
-                            'global_step': self.global_step,
-                            'epoch': self.epoch,
-                            'lr': lr_scheduler.get_last_lr()[0]
-                        }
+                    # step optimizer
+                    if self.global_step % cfg.training.gradient_accumulate_every == 0:
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
+                        lr_scheduler.step()
+                    
+                    # update ema
+                    if cfg.training.use_ema:
+                        ema.step(accelerator.unwrap_model(self.model))
 
-                        is_last_batch = (batch_idx == (len(train_dataloader)-1))
-                        if not is_last_batch:
-                            # log of last step is combined with validation and rollout
-                            accelerator.log(step_log, step=self.global_step)
-                            json_logger.log(step_log)
-                            self.global_step += 1
+                    # logging
+                    raw_loss_cpu = raw_loss.item()
+                    # tepoch.set_postfix(loss=raw_loss_cpu, refresh=False)
+                    train_losses.append(raw_loss_cpu)
+                    step_log = {
+                        'train_loss': raw_loss_cpu,
+                        'global_step': self.global_step,
+                        'epoch': self.epoch,
+                        'lr': lr_scheduler.get_last_lr()[0]
+                    }
 
-                        if (cfg.training.max_train_steps is not None) \
-                            and batch_idx >= (cfg.training.max_train_steps-1):
-                            break
+                    is_last_batch = (batch_idx == (len(train_dataloader)-1))
+                    if not is_last_batch:
+                        # log of last step is combined with validation and rollout
+                        accelerator.log(step_log, step=self.global_step)
+                        json_logger.log(step_log)
+                        self.global_step += 1
+
+                    # if (cfg.training.max_train_steps is not None) \
+                    #     and batch_idx >= (cfg.training.max_train_steps-1):
+                    #     break
 
                 # at the end of each epoch
                 # replace train_loss with epoch average
@@ -267,20 +295,23 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
 
                 # run rollout
                 if cfg.training.rollout_every is not None:
-                    if self.epoch > 0 and (self.epoch % cfg.training.rollout_every) == 0 and accelerator.is_main_process:
-                        env_runner: BaseImageRunner
-                        env_runner = hydra.utils.instantiate(
-                            cfg.task.env_runner,
-                            output_dir=self.output_dir)
-                        assert isinstance(env_runner, BaseImageRunner)
+                    if self.epoch > 0 and (self.epoch % cfg.training.rollout_every) == 0:
+                        if accelerator.is_main_process:
+                            env_runner: BaseImageRunner
+                            env_runner = hydra.utils.instantiate(
+                                cfg.task.env_runner,
+                                output_dir=self.output_dir)
+                            assert isinstance(env_runner, BaseImageRunner)
 
-                        runner_log = env_runner.run(policy)
-                        # log all
-                        step_log.update(runner_log)
+                            runner_log = env_runner.run(policy)
+                            # log all
+                            step_log.update(runner_log)
 
-                        # close and discard env_runner
-                        env_runner.close()
-                        del env_runner
+                            # close and discard env_runner
+                            env_runner.close()
+                            del env_runner
+                        
+                        accelerator.wait_for_everyone()
 
                 # run validation
                 # if (self.epoch % cfg.training.val_every) == 0:
@@ -301,49 +332,55 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
                 #             step_log['val_loss'] = val_loss
 
                 # run diffusion sampling on a training batch
-                if (self.epoch % cfg.training.sample_every) == 0 and accelerator.is_main_process:
-                    with torch.no_grad():
-                        # sample trajectory from training set, and evaluate difference
-                        batch = dict_apply(train_sampling_batch, lambda x: x.to(device, non_blocking=True))
-                        obs_dict = batch['obs']
-                        gt_action = batch['action']
-                        
-                        result = policy.predict_action(obs_dict)
-                        pred_action = result['action_pred']
-                        mse = torch.nn.functional.mse_loss(pred_action, gt_action)
-                        step_log['train_action_mse_error'] = mse.item()
-                        del batch
-                        del obs_dict
-                        del gt_action
-                        del result
-                        del pred_action
-                        del mse
+                if (self.epoch % cfg.training.sample_every) == 0:
+                    if accelerator.is_main_process:
+                        with torch.no_grad():
+                            # sample trajectory from training set, and evaluate difference
+                            batch = dict_apply(train_sampling_batch, lambda x: x.to(device, non_blocking=True))
+                            obs_dict = batch['obs']
+                            gt_action = batch['action']
+                            
+                            result = policy.predict_action(obs_dict)
+                            pred_action = result['action_pred']
+                            mse = torch.nn.functional.mse_loss(pred_action, gt_action)
+                            step_log['train_action_mse_error'] = mse.item()
+                            del batch
+                            del obs_dict
+                            del gt_action
+                            del result
+                            del pred_action
+                            del mse
+                    
+                    accelerator.wait_for_everyone()
                 
                 # checkpoint
-                if self.epoch > 0 and (self.epoch % cfg.training.checkpoint_every) == 0 and accelerator.is_main_process:
-                    model_ddp = self.model
-                    self.model = accelerator.unwrap_model(self.model)
-                    # checkpointing
-                    if cfg.checkpoint.save_last_ckpt:
-                        self.save_checkpoint()
-                    if cfg.checkpoint.save_last_snapshot:
-                        self.save_snapshot()
+                if self.epoch > 0 and (self.epoch % cfg.training.checkpoint_every) == 0:
+                    if accelerator.is_main_process:
+                        model_ddp = self.model
+                        self.model = accelerator.unwrap_model(self.model)
+                        # checkpointing
+                        if cfg.checkpoint.save_last_ckpt:
+                            self.save_checkpoint()
+                        if cfg.checkpoint.save_last_snapshot:
+                            self.save_snapshot()
 
-                    # sanitize metric names
-                    metric_dict = dict()
-                    for key, value in step_log.items():
-                        new_key = key.replace('/', '_')
-                        metric_dict[new_key] = value
+                        # sanitize metric names
+                        metric_dict = dict()
+                        for key, value in step_log.items():
+                            new_key = key.replace('/', '_')
+                            metric_dict[new_key] = value
+                        
+                        # We can't copy the last checkpoint here
+                        # since save_checkpoint uses threads.
+                        # therefore at this point the file might have been empty!
+                        topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
+
+                        if topk_ckpt_path is not None:
+                            self.save_checkpoint(path=topk_ckpt_path)
+
+                        self.model = model_ddp
                     
-                    # We can't copy the last checkpoint here
-                    # since save_checkpoint uses threads.
-                    # therefore at this point the file might have been empty!
-                    topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
-
-                    if topk_ckpt_path is not None:
-                        self.save_checkpoint(path=topk_ckpt_path)
-
-                    self.model = model_ddp
+                    accelerator.wait_for_everyone()
                 # ========= eval end for this epoch ==========
 
                 # end of epoch
