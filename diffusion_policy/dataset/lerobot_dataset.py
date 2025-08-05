@@ -29,7 +29,7 @@ import torch
 from typing import Dict, List
 
 
-from gr00t.data.dataset import LeRobotSingleDataset, LE_ROBOT_MODALITY_FILENAME, ModalityConfig, LE_ROBOT_EPISODE_FILENAME
+from gr00t.data.dataset import LeRobotSingleDataset, LE_ROBOT_MODALITY_FILENAME, ModalityConfig, LE_ROBOT_EPISODE_FILENAME, LeRobotMixtureDataset
 import pathlib
 
 def get_modality_keys(dataset_path: pathlib.Path) -> dict[str, list[str]]:
@@ -102,6 +102,7 @@ class LerobotDataset(LeRobotSingleDataset, BaseImageDataset):
             embodiment_tag="oxe_droid",
             modality_configs=modality_configs,
         )
+        self.start_indices = np.cumsum(self.trajectory_lengths) - self.trajectory_lengths
         rgb_keys = dict()
         lowdim_keys = dict()
         obs_shape_meta = copy.deepcopy(shape_meta['obs'])
@@ -161,7 +162,6 @@ class LerobotDataset(LeRobotSingleDataset, BaseImageDataset):
             # move channel last to channel first
             # T,H,W,C
             # convert uint8 image to float32
-            print(data[lerobot_key].shape)
             obs_dict[key] = np.moveaxis(data[lerobot_key][T_slice],-1,1
                 ).astype(np.float32) / 255.
             # T,C,H,W
@@ -254,3 +254,128 @@ class LerobotDataset(LeRobotSingleDataset, BaseImageDataset):
         for key in self.rgb_keys:
             normalizer[key] = get_image_range_normalizer()
         return normalizer
+
+class LerobotCotrainingDataset(LeRobotMixtureDataset, BaseImageDataset):
+    def __init__(self,
+            shape_meta: dict,
+            dataset_paths: List[str],
+            horizon=1,
+            pad_before=0,
+            pad_after=0,
+            n_obs_steps=None,
+            abs_action=False,
+            rotation_rep='rotation_6d', # ignored when abs_action=False
+            use_legacy_normalizer=False,
+            use_cache=False,
+            seed=42,
+            val_ratio=0.0, # validation not implemented yet,
+            ds_weights = None,
+            balance_dataset_weights=False,
+            balance_trajectory_weights=False,
+            metadata_config: dict = {
+            "percentile_mixing_method": "weighted_average",
+        } 
+        ):
+        datasets = [LerobotDataset(shape_meta=shape_meta, dataset_path=dataset_path, horizon=horizon, pad_after=pad_after, pad_before=pad_before, n_obs_steps=n_obs_steps, abs_action=abs_action, rotation_rep=rotation_rep, use_legacy_normalizer=use_legacy_normalizer, use_cache=use_cache, seed=seed, val_ratio=val_ratio) for dataset_path in dataset_paths]
+        self.abs_action = abs_action
+        assert not self.abs_action, "abs_action is not supported in LerobotCotrainingDataset"
+        assert not ds_weights or len(ds_weights) == len(datasets), \
+            f"ds_weights length {len(ds_weights)} != datasets length {len(datasets)}"
+        dataset_mixture = [(ds, 1.0) for ds in datasets] if ds_weights is None else list(zip(datasets, ds_weights))
+        LeRobotMixtureDataset.__init__(self,  data_mixture=dataset_mixture, mode="train",  balance_dataset_weights=balance_dataset_weights, balance_trajectory_weights=balance_trajectory_weights, metadata_config=metadata_config)
+        rgb_keys = dict()
+        lowdim_keys = dict()
+        obs_shape_meta = copy.deepcopy(shape_meta['obs'])
+        self.lang_emb = obs_shape_meta.pop('lang_emb', None)
+        for key, attr in obs_shape_meta.items():
+            type = attr.get('type', 'low_dim')
+            if type == 'rgb':
+                rgb_keys[key] = attr["lerobot_keys"]
+            elif type == 'low_dim':
+                lowdim_keys[key] = attr["lerobot_keys"]
+        self.rgb_keys = rgb_keys
+        self.lowdim_keys = lowdim_keys
+        self.n_obs_steps = n_obs_steps
+        self.shape_meta = shape_meta
+        self.action_info = self.shape_meta['action']
+        self.lerobot_action_keys = self.action_info['lerobot_keys']
+        self.action_size = self.action_info['shape'][0]
+    
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        dataset, trajectory_name, step = self.sample_step(idx)
+        global_ds_index = self.to_global_index(dataset, trajectory_name, step)
+        return dataset.__getitem__(global_ds_index)
+
+    def to_global_index(self, dataset, trajectory_id: int, base_index: int) -> int:
+        """Convert (trajectory_id, base_index) → global index for a given dataset"""
+        traj_idx = dataset.get_trajectory_index(trajectory_id) 
+        g_idx = int(dataset.start_indices[traj_idx] + base_index)
+        # # TODO: remove
+        # assert g_idx == dataset.all_steps.index((trajectory_id, base_index)), \
+        #     f"g_idx {g_idx} != dataset.all_steps.index({trajectory_id}, {base_index})"
+        return g_idx
+    
+    def __len__(self):
+        return np.sum(self.dataset_lengths)
+
+    def get_normalizer(self, **kwargs) -> LinearNormalizer:
+        # Almost same as robomimic_replay_image_dataset.py
+        normalizer = LinearNormalizer()
+        assert not self.abs_action, "normalizer for abs_action is not supported in LerobotDataset"
+
+        # tag should be same for all datasets
+        tag = self.datasets[0].tag
+        # TODO, look into how these vals are affected in original code
+        all_stats = self.merged_metadata[tag].statistics
+
+        scale = np.ones((self.action_size), dtype=np.float32)
+        offset = np.zeros((self.action_size), dtype=np.float32)
+        normalizer['action'] = SingleFieldLinearNormalizer.create_manual(
+            scale=scale,
+            offset=offset,
+            input_stats_dict={}, #stat
+        )
+
+
+        for key, lerobot_keys in self.lowdim_keys.items():
+            assert len(lerobot_keys) == 1, f"multiple lerobot keys for {key} not supported"
+            lerobot_key = lerobot_keys[0]
+            # strip "state." prefix
+            lerobot_key = lerobot_key.replace("state.", "")
+            stat = all_stats.state[lerobot_key].model_dump()
+            for k, v in stat.items():
+                if type(v) is np.ndarray:
+                    stat[k] = v.astype(np.float32)
+
+            if key.endswith('pos'):
+                this_normalizer = get_range_normalizer_from_stat(stat)
+            elif key.endswith('quat'):
+                # quaternion is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('qpos'):
+                this_normalizer = get_range_normalizer_from_stat(stat)
+            elif key.endswith('sin'):
+                # sin is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            elif key.endswith('cos'):
+                # sin is in [-1,1] already
+                this_normalizer = get_identity_normalizer_from_stat(stat)
+            else:
+                raise RuntimeError('unsupported')
+            normalizer[key] = this_normalizer
+        # lang_emb
+        if self.lang_emb is not None:
+            dim = int(np.prod(self.lang_emb["shape"]))  
+            scale  = np.ones((dim,), dtype=np.float32)  
+            offset = np.zeros((dim,), dtype=np.float32) 
+            normalizer[LANG_EMB_KEY] = SingleFieldLinearNormalizer.create_manual(
+                scale=scale,
+                offset=offset,
+                input_stats_dict={}, #stat
+            )
+
+        # image
+        for key in self.rgb_keys:
+            normalizer[key] = get_image_range_normalizer()
+        return normalizer
+
