@@ -201,6 +201,8 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
             train_dataloader, val_dataloader, self.model, self.optimizer, lr_scheduler
         )
         train_dataloader_iter = iter(train_dataloader)
+        print("dataloader length:", len(train_dataloader))
+        print("dataset length:", len(dataset))
         device = self.model.device
         if self.ema_model is not None:
             self.ema_model.to(device)
