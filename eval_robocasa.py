@@ -73,9 +73,35 @@ ATOMIC_TASKS = [
     "TurnOnElectricKettle",
 ]
 
+DEFAULT_TASKS = [
+    "CoffeeSetupMug",
+    "OpenCabinet",
+    "PnPCounterToCabinet",
+    "PnPSinkToCounter",
+    "TurnOffStove",
+    "TurnOnMicrowave",
+    "TurnOnSinkFaucet",
+    "ArrangeBreadBasket",
+    "ArrangeTea",
+    # "CuttingToolSelection",
+    # "DeliverStraw",
+    "DessertAssembly",
+    # "KettleBoiling",
+    "PreSoakPan",
+    "PrepareCoffee",
+    "RecycleBottlesByType",
+    "SearingMeat",
+    # "StoreLeftoversInBowl",
+    "WashFruitColander",
+    "WeighIngredients",
+]
 
-def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwrite):
-    output_dir = os.path.join(os.path.dirname(checkpoint), "../evals", os.path.basename(checkpoint).replace(".ckpt", ""), split, task)
+
+def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs, split, overwrite):
+    if base_output_dir is None:
+        base_output_dir = os.path.join(os.path.dirname(checkpoint), "../evals", os.path.basename(checkpoint).replace(".ckpt", ""), split)
+
+    output_dir = os.path.join(base_output_dir, task)
 
     if overwrite is False and os.path.exists(output_dir):
         click.confirm(f"Output path {output_dir} already exists! Overwrite?", abort=True)
@@ -86,9 +112,17 @@ def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwri
     cfg = payload['cfg']
     cfg = copy.deepcopy(OmegaConf.to_container(cfg))
     cfg["task"]["env_runner"]["env_kwargs"] = {
-        "generative_textures": None,
-        "randomize_cameras": False,
         "seed": 1111111,
+        "use_camera_obs": True,
+        "use_object_obs": True,
+        "camera_depths": False,
+        "has_renderer": False,
+        "has_offscreen_renderer": True,
+        "camera_names": ['robot0_agentview_left', 'robot0_agentview_right', 'robot0_eye_in_hand'],
+        "camera_widths": 256,
+        "camera_heights": 256,
+        "ignore_done": True,
+        "reward_shaping": False,
     }
     if split == "train":
         cfg["task"]["env_runner"]["env_kwargs"].update(
@@ -102,6 +136,7 @@ def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwri
             style_ids=None,
             layout_ids=None,
             layout_and_style_ids=[[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]],
+            clutter_mode=1,
         )
     elif split == "all":
         cfg["task"]["env_runner"]["env_kwargs"].update(
@@ -113,7 +148,7 @@ def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwri
         raise ValueError("Invalid split. Choose among train/test/all")
     cfg = OmegaConf.create(cfg)
 
-    ds_path, ds_meta = get_ds_path(task=task, ds_type="human_im", return_info=True)
+    ds_path, ds_meta = get_ds_path(task=task, ds_type="human_raw", split=split, return_info=True)
     
     cfg.task.env_runner.n_train = 0
     cfg.task.env_runner.n_test = num_rollouts
@@ -123,7 +158,7 @@ def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwri
     cfg.task.env_runner.dataset_path = ds_path
     cfg.task.dataset.dataset_path = ds_path
     cfg.task.env_runner.max_steps = ds_meta["horizon"]
-    cfg.task.env_runner.n_envs = 10
+    cfg.task.env_runner.n_envs = num_envs
 
     cls = hydra.utils.get_class(cfg._target_)
     workspace = cls(cfg, output_dir=output_dir)
@@ -164,18 +199,18 @@ def eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwri
 @click.option('-c', '--checkpoint', required=True)
 @click.option('-o', '--output_dir', default=None)
 @click.option('-d', '--device', default='cuda:0')
-@click.option('-t', '--tasks', multiple=True, default=[])
+@click.option('-t', '--tasks', multiple=True, default=DEFAULT_TASKS)
 @click.option('-n', '--num_rollouts', default=50)
-@click.option('-s', '--split', default='train')
+@click.option('-e', '--num_envs', default=10)
+@click.option('-s', '--split', required=True)
 @click.option('--overwrite', is_flag=True, help='Overwrite existing evals.')
-def main(checkpoint, output_dir, device, tasks, num_rollouts, split, overwrite):
-    if len(tasks) == 1 and  tasks[0] == "atomic":
+def main(checkpoint, output_dir, device, tasks, num_rollouts, num_envs, split, overwrite):
+    if len(tasks) == 1 and tasks[0] == "atomic":
         tasks = ATOMIC_TASKS
     
-    assert output_dir is None
     for task_i, task in enumerate(tasks):
         print(colored(f"[{task_i+1}/{len(tasks)}] running evals for {task}", "yellow"))
-        eval_task(checkpoint, output_dir, device, task, num_rollouts, split, overwrite)
+        eval_task(checkpoint, output_dir, device, task, num_rollouts, num_envs, split, overwrite)
 
 if __name__ == '__main__':
     main()
