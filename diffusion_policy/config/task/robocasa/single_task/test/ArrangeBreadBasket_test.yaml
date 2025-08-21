@@ -1,4 +1,4 @@
-name: TurnOffStove_mg_groot
+name: ArrangeBreadBasket_test
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -30,13 +30,13 @@ shape_meta: &shape_meta
     shape: [12]
     lerobot_keys: ['action.end_effector_position', 'action.end_effector_rotation', 'action.gripper_close', 'action.base_motion', 'action.control_mode',]
 
-dataset_path: &dataset_path '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffStove/mg/demo/2025-07-29-12-12-09/groot_v2'
+dataset_path: &dataset_path '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/test/composite/ArrangeBreadBasket/20250809/groot_v2'
 
 abs_action: &abs_action False
 
 env_runner:
   _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffStove/mg/demo/2025-07-29-12-12-09/demo_im128.hdf5
+  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/test/composite/ArrangeBreadBasket/20250809/demo.hdf5
   shape_meta: *shape_meta
   # costs 1GB per env
   n_train: 0
@@ -45,7 +45,7 @@ env_runner:
   n_test: 50
   n_test_vis: 4
   test_start_seed: 100000
-  max_steps: 700
+  max_steps: 1500
   n_obs_steps: ${n_obs_steps}
   n_action_steps: ${n_action_steps}
   render_obs_key: 'robot0_agentview_right_image'
@@ -57,10 +57,22 @@ env_runner:
   n_envs: 5
   env_kwargs:
     seed: 1111111
-    obj_instance_split: 'train'
-    style_ids: -2
-    layout_ids: -2
-    # layout_and_style_ids: [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]]
+    obj_instance_split: 'test'
+    style_ids: null
+    layout_ids: null
+    layout_and_style_ids: [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]]
+    clutter_mode: 1
+
+    use_camera_obs: true
+    use_object_obs: true
+    camera_depths: false
+    has_renderer: false
+    has_offscreen_renderer: true
+    camera_names: ['robot0_agentview_left', 'robot0_agentview_right', 'robot0_eye_in_hand']
+    camera_widths: 128
+    camera_heights: 128
+    ignore_done: true
+    reward_shaping: false
 # evaluation at this config requires a 16 core 64GB instance.
 
 dataset:

@@ -2,8 +2,10 @@ import json
 import argparse
 import os
 import numpy as np
-import diffusion_policy
 from robocasa.utils.dataset_registry import SINGLE_STAGE_TASK_DATASETS, MULTI_STAGE_TASK_DATASETS
+
+
+BASE_EXP_DIR = "/mnt/amlfs-01/shared/robocasa_benchmark/diffusion_policy/data/outputs"
 
 def compute_stats(checkpoint_path):
     stats = dict(
@@ -11,8 +13,12 @@ def compute_stats(checkpoint_path):
         test=dict(),
     )
 
+    assert os.path.exists(os.path.join(BASE_EXP_DIR, checkpoint_path))
+
     for split in ["train", "test"]:
-        split_dir = os.path.join(diffusion_policy.__path__[0], "../data/outputs", checkpoint_path, split)
+        split_dir = os.path.join(BASE_EXP_DIR, checkpoint_path, split)
+        if not os.path.exists(split_dir):
+            continue
         for task_name in os.listdir(split_dir):
             task_dir = os.path.join(split_dir, task_name)
             stats_path = os.path.join(task_dir, "eval_log.json")
@@ -21,7 +27,9 @@ def compute_stats(checkpoint_path):
             with open(stats_path, 'r') as f:
                 this_data = json.load(f)
             
-            stats[split][task_name] = int(this_data["success_rate"] * 100)
+            sr_key = f"success_rate/{task_name}"
+            if sr_key in this_data:
+                stats[split][task_name] = int(this_data[sr_key] * 100)
 
     all_task_names = set(list(stats["train"].keys()) + list(stats["test"].keys()))
     atomic_task_names = [task for task in all_task_names if task in list(SINGLE_STAGE_TASK_DATASETS.keys())]
@@ -31,8 +39,12 @@ def compute_stats(checkpoint_path):
     train_vals = []
     test_vals = []
     for task_name in sorted(atomic_task_names):
-        train_sr = stats["train"].get(task_name)
-        test_sr = stats["test"].get(task_name)
+        train_sr = None
+        test_sr = None
+        if "train" in stats:
+            train_sr = stats["train"].get(task_name)
+        if "test" in stats:
+            test_sr = stats["test"].get(task_name)
         str_to_print = f"{task_name}: {train_sr} / {test_sr}"
         print(str_to_print)
 

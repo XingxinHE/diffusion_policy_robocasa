@@ -1,4 +1,4 @@
-name: human_46atomic_130composite_groot
+name: human_46atomic_139composite
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -85,8 +85,8 @@ dataset_paths: &dataset_paths [
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/AirDryFruit/20250718/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/AlcoholServingPrep/20250724/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/ArrangeBreadBasket/20250716/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/ArrangeTea/20250714/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/ArrangeVegetables/20250714/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/ArrangeTea/20250714/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/ArrangeVegetables/20250714/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/AssembleCookingArray/20250721/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/BalancedMealPrep/20250729/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/BeverageOrganization/20250725/groot_v2',
@@ -118,16 +118,16 @@ dataset_paths: &dataset_paths [
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/CupcakeCleanup/20250716/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/CutBuffetPizza/20250730/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/CuttingToolSelection/20250730/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DateNight/20250725/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DefrostByCategory/20250716/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DateNight/20250725/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DefrostByCategory/20250716/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DeliverStraw/20250723/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DessertAssembly/20250719/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DessertUpgrade/20250724/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DivideBasins/20250718/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DivideBuffetTrays/20250730/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DrainVeggies/20250723/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DrinkwareConsolidation/20250723/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DryDishes/20250714/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DivideBuffetTrays/20250730/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DrainVeggies/20250723/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DrinkwareConsolidation/20250723/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DryDishes/20250714/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/DryDrinkware/20250714/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/FillKettle/20250721/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/FoodCleanup/20250715/groot_v2',
@@ -179,7 +179,7 @@ dataset_paths: &dataset_paths [
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/QuickThaw/20250725/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RecycleBottlesBySize/20250717/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RecycleBottlesByType/20250717/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RecycleSodaCans/20250719/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RecycleSodaCans/20250719/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RecycleStackedYogurt/20250717/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RestockBowls/20250725/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/RestockPantry/20250714/groot_v2',

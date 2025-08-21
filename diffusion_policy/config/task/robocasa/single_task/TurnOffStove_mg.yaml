@@ -1,4 +1,4 @@
-name: BreadSetupSlicing_groot
+name: TurnOffStove_mg
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -30,13 +30,13 @@ shape_meta: &shape_meta
     shape: [12]
     lerobot_keys: ['action.end_effector_position', 'action.end_effector_rotation', 'action.gripper_close', 'action.base_motion', 'action.control_mode',]
 
-dataset_path: &dataset_path '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/BreadSetupSlicing/20250719/groot_v2'
+dataset_path: &dataset_path '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffStove/mg/demo/2025-07-29-12-12-09/groot_v2'
 
 abs_action: &abs_action False
 
 env_runner:
   _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/composite/BreadSetupSlicing/20250719/demo_im128.hdf5
+  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffStove/mg/demo/2025-07-29-12-12-09/demo_im128.hdf5
   shape_meta: *shape_meta
   # costs 1GB per env
   n_train: 0
@@ -45,7 +45,7 @@ env_runner:
   n_test: 50
   n_test_vis: 4
   test_start_seed: 100000
-  max_steps: 800
+  max_steps: 700
   n_obs_steps: ${n_obs_steps}
   n_action_steps: ${n_action_steps}
   render_obs_key: 'robot0_agentview_right_image'

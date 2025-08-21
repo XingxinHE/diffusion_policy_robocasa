@@ -76,6 +76,9 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
         # set split_batches=True so that effective batch size stays the same regardless of num GPUs
         accelerator = Accelerator(log_with='wandb', kwargs_handlers=[ddp_kwargs, timeout_handler], split_batches=True)
 
+        if cfg.training.debug:
+            cfg.logging.project = "debug"
+        
         wandb_cfg = OmegaConf.to_container(cfg.logging, resolve=True)
 
         wandb_cfg.pop('project')
@@ -218,6 +221,9 @@ class TrainDiffusionTransformerHybridWorkspace(BaseWorkspace):
             cfg.training.checkpoint_every = 1
             cfg.training.val_every = 1
             cfg.training.sample_every = 1
+
+            cfg.task.env_runner.n_test = 5
+            cfg.task.env_runner.max_steps = 40
 
         # training loop
         log_path = os.path.join(self.output_dir, 'logs.json.txt')

@@ -141,7 +141,7 @@ class LerobotDataset(LeRobotSingleDataset, BaseImageDataset):
     
         with open(episode_path, "r") as f:
             episode_metadata = [json.loads(line) for line in f]
-        id2remark = {e["episode_index"]: e["remarks"] for e in episode_metadata}
+        id2remark = {e["episode_index"]: e["tasks"][0] for e in episode_metadata}
         
         for ep_batch in tqdm(np.array_split(self.trajectory_ids, int(math.ceil(len(self.trajectory_ids) / 64)))):
             # get language embedding
@@ -275,7 +275,7 @@ class LerobotCotrainingDataset(LeRobotMixtureDataset, BaseImageDataset):
             seed=42,
             val_ratio=0.0, # validation not implemented yet,
             ds_weights=None,
-            ds_weights_alpha=0.0,
+            ds_weights_alpha=0.40,
             metadata_config: dict = {
             "percentile_mixing_method": "weighted_average",
         } 
@@ -309,6 +309,7 @@ class LerobotCotrainingDataset(LeRobotMixtureDataset, BaseImageDataset):
             ds_weights = np.array([np.power(len(dataset), ds_weights_alpha) for dataset in datasets])
             # the groot dataloader requires that at least one dataset has weight 1.0
             ds_weights = ds_weights / ds_weights[0]
+            print("dataset weights:", ds_weights)
         dataset_mixture = list(zip(datasets, ds_weights))
         # set balance_dataset_weights to False, since we are calculating weights ourselves
         LeRobotMixtureDataset.__init__(self,  data_mixture=dataset_mixture, mode="train",  balance_dataset_weights=False, balance_trajectory_weights=False, metadata_config=metadata_config)

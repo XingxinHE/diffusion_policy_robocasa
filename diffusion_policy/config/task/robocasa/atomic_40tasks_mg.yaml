@@ -1,4 +1,4 @@
-name: atomic_36tasks_mg_groot
+name: atomic_40tasks_mg
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -50,14 +50,14 @@ dataset_paths: &dataset_paths [
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPToasterOvenToCounter/mg/demo/2025-08-02-08-21-02/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPStoveToCounter/mg/demo/2025-07-29-12-21-01/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPCabinetToCounter/mg/demo/2025-07-29-14-54-21/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPSinkToCounter/mg/demo/2025-07-29-16-41-44/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPSinkToCounter/mg/demo/2025-07-29-16-41-44/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPCounterToCabinet/mg/demo/2025-07-30-15-40-29/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/StartCoffeeMachine/mg/demo/2025-07-28-13-24-54/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnMicrowave/mg/demo/2025-07-29-12-21-01/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnStove/mg/demo/2025-07-29-14-45-53/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffSinkFaucet/mg/demo/2025-07-29-16-56-38/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffStove/mg/demo/2025-07-29-12-12-09/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnSinkFaucet/mg/demo/2025-07-30-15-40-29/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnSinkFaucet/mg/demo/2025-07-30-15-40-29/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnToasterOven/mg/demo/2025-07-29-16-48-39/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOffMicrowave/mg/demo/2025-08-02-00-02-58/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnOnElectricKettle/mg/demo/2025-08-02-00-00-55/groot_v2',
@@ -68,10 +68,10 @@ dataset_paths: &dataset_paths [
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/OpenOven/mg/demo/2025-08-02-08-24-34/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/OpenToasterOvenDoor/mg/demo/2025-08-02-08-07-17/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/TurnSinkSpout/mg/demo/2025-08-02-08-30-12/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/CloseFridge/mg/demo/2025-08-02-00-06-05/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/CloseFridge/mg/demo/2025-08-02-00-06-05/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/OpenStandMixerHead/mg/demo/2025-08-02-08-09-59/groot_v2',
   '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPCounterToStandMixer/mg/demo/2025-08-02-08-14-30/groot_v2',
-  # '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPToasterToCounter/mg/demo/2025-08-02-08-21-08/groot_v2',
+  '/mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/train/atomic/PnPToasterToCounter/mg/demo/2025-08-02-08-21-08/groot_v2',
 ]
 
 abs_action: &abs_action False

@@ -384,7 +384,8 @@ class RobomimicImageRunner(BaseImageRunner):
             if video_path is not None:
                 sim_video = wandb.Video(video_path)
                 log_data[prefix+f'sim_video_{seed}'] = sim_video
-        log_data['success_rate'] = success_rate
+        env_name = self.env_meta["env_name"]
+        log_data[f'success_rate/{env_name}'] = success_rate
         # log aggregate metrics
         for prefix, value in max_rewards.items():
             name = prefix+'mean_score'
