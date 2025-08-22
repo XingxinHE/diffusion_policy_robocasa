@@ -23,79 +23,11 @@ from termcolor import colored
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 
 from robocasa.utils.dataset_registry import get_ds_path
+from robocasa.utils.dataset_registry import SINGLE_STAGE_TASK_DATASETS, MULTI_STAGE_TASK_DATASETS, POST_TRAINING_TASKS
 
 
-ATOMIC_TASKS = [
-    "PnPCounterToSink",
-    "PnPCounterToCabinet",
-    "PnPSinkToCounter",
-    "TurnOnSinkFaucet",
-    "TurnOffStove",
-    "OpenCabinet",
-    "CloseCabinet",
-    "TurnOnMicrowave",
-    "CoffeeServeMug",
-    "CoffeeSetupMug",
-    "OpenFridge",
-    "CloseFridge",
-    "TurnOnToasterOven",
-    "TurnOnToaster",
-    "CloseStandMixerHead",
-    "PnPCounterToMicrowave",
-    "PnPMicrowaveToCounter",
-    "PnPCounterToStove",
-    "PnPStoveToCounter",
-    "PnPCounterToOven",
-    "PnPToasterToCounter",
-    "PnPCounterToToasterOven",
-    "PnPToasterOvenToCounter",
-    "PnPCounterToStandMixer",
-    "PnPCabinetToCounter",
-    "OpenMicrowave",
-    "CloseMicrowave",
-    "OpenDishwasher",
-    "CloseDishwasher",
-    "OpenDrawer",
-    "CloseDrawer",
-    "OpenToasterOvenDoor",
-    "CloseToasterOvenDoor",
-    "OpenOven",
-    "CloseOven",
-    "StartCoffeeMachine",
-    "TurnOffMicrowave",
-    "TurnOffSinkFaucet",
-    "TurnSinkSpout",
-    "OpenStandMixerHead",
-    "TurnOnStove",
-    "AdjustToasterOvenTemperature",
-    "OpenElectricKettleLid",
-    "CloseElectricKettleLid",
-    "TurnOnElectricKettle",
-]
-
-DEFAULT_TASKS = [
-    "CoffeeSetupMug",
-    "OpenCabinet",
-    "PnPCounterToCabinet",
-    "PnPSinkToCounter",
-    "TurnOffStove",
-    "TurnOnMicrowave",
-    "TurnOnSinkFaucet",
-    "ArrangeBreadBasket",
-    "ArrangeTea",
-    # "CuttingToolSelection",
-    # "DeliverStraw",
-    "DessertAssembly",
-    # "KettleBoiling",
-    "PreSoakPan",
-    "PrepareCoffee",
-    "RecycleBottlesByType",
-    "SearingMeat",
-    # "StoreLeftoversInBowl",
-    "WashFruitColander",
-    "WeighIngredients",
-]
-
+ATOMIC_TASKS = list(SINGLE_STAGE_TASK_DATASETS.keys())
+DEFAULT_TASKS = POST_TRAINING_TASKS["atomic"] + POST_TRAINING_TASKS["composite"]
 
 def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs, split, overwrite):
     if base_output_dir is None:
