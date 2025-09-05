@@ -35,8 +35,12 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
 
     output_dir = os.path.join(base_output_dir, task)
 
-    if overwrite is False and os.path.exists(output_dir):
-        click.confirm(f"Output path {output_dir} already exists! Overwrite?", abort=True)
+    out_path = os.path.join(output_dir, 'eval_log.json')
+    if overwrite is False and os.path.exists(out_path):
+        # click.confirm(f"Output path {out_path} already exists! Overwrite?", abort=True)
+        print(f"Eval stats path {out_path} already exists! Skipping.")
+        return
+
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     # load checkpoint
@@ -157,7 +161,7 @@ def main(checkpoint, output_dir, device, tasks, num_rollouts, num_envs, split): 
     
     for task_i, task in enumerate(tasks):
         print(colored(f"[{task_i+1}/{len(tasks)}] running evals for {task}", "yellow"))
-        eval_task(checkpoint, output_dir, device, task, num_rollouts, num_envs, split, overwrite=True)
+        eval_task(checkpoint, output_dir, device, task, num_rollouts, num_envs, split, overwrite=False)
 
 if __name__ == '__main__':
     main()
