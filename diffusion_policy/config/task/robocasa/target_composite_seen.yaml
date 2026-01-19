@@ -1,4 +1,4 @@
-name: posttrain_composite_unseen
+name: target_composite_seen
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -34,7 +34,7 @@ abs_action: &abs_action False
 
 env_runner:
   _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/test/atomic/PnPCounterToCabinet/20250811/demo.hdf5
+  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v1.0/test/atomic/PnPCounterToCabinet/20250811/demo.hdf5
   shape_meta: *shape_meta
   # costs 1GB per env
   n_train: 0
@@ -76,7 +76,7 @@ env_runner:
 dataset:
   _target_: diffusion_policy.dataset.lerobot_dataset.LerobotCotrainingDataset
   shape_meta: *shape_meta
-  dataset_soup: posttrain_composite_unseen
+  dataset_soup: posttrain_composite_seen
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
   pad_after: ${eval:'${n_action_steps}-1'}

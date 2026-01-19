@@ -1,4 +1,4 @@
-name: posttrain_composite_seen
+name: finetune_target_atomic_seen
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -32,9 +32,11 @@ shape_meta: &shape_meta
 
 abs_action: &abs_action False
 
+ckpt_path: /scratch/10301/snasiriany/dp_expdata/outputs/2025.09.11/16.10.56_train_diffusion_transformer_hybrid_pretrain_human300_mg60/checkpoints/epoch=1000-test_mean_score=-1.000.ckpt
+
 env_runner:
   _target_: diffusion_policy.env_runner.robomimic_image_runner.RobomimicImageRunner
-  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v0.5/test/atomic/PnPCounterToCabinet/20250811/demo.hdf5
+  dataset_path: /mnt/amlfs-01/shared/robocasa_benchmark/robocasa-datasets/v1.0/test/atomic/PnPCounterToCabinet/20250811/demo.hdf5
   shape_meta: *shape_meta
   # costs 1GB per env
   n_train: 0
@@ -76,7 +78,7 @@ env_runner:
 dataset:
   _target_: diffusion_policy.dataset.lerobot_dataset.LerobotCotrainingDataset
   shape_meta: *shape_meta
-  dataset_soup: posttrain_composite_seen
+  dataset_soup: posttrain_atomic_seen
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
   pad_after: ${eval:'${n_action_steps}-1'}

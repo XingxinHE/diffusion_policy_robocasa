@@ -22,12 +22,9 @@ import json
 from termcolor import colored
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 
-from robocasa.utils.dataset_registry import get_ds_meta
-from robocasa.utils.dataset_registry import SINGLE_STAGE_TASK_DATASETS, MULTI_STAGE_TASK_DATASETS, POST_TRAINING_TASKS
+from robocasa.utils.dataset_registry_utils import get_ds_meta
+from robocasa.utils.dataset_registry import TASK_SOUP_REGISTRY
 
-
-ATOMIC_TASKS = list(SINGLE_STAGE_TASK_DATASETS.keys())
-DEFAULT_TASKS = POST_TRAINING_TASKS["atomic"] + POST_TRAINING_TASKS["composite"]
 
 def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs, split, overwrite):
     if base_output_dir is None:
@@ -60,15 +57,15 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
         "ignore_done": True,
         "reward_shaping": False,
     }
-    if split == "train":
+    if split == "pretrain":
         cfg["task"]["env_runner"]["env_kwargs"].update(
-            obj_instance_split="train",
+            obj_instance_split="pretrain",
             style_ids=-2,
             layout_ids=-2,
         )
-    elif split == "test":
+    elif split == "target":
         cfg["task"]["env_runner"]["env_kwargs"].update(
-            obj_instance_split="test",
+            obj_instance_split="target",
             style_ids=None,
             layout_ids=None,
             layout_and_style_ids=[[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]],
@@ -84,7 +81,7 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
         raise ValueError("Invalid split. Choose among train/test/all")
     cfg = OmegaConf.create(cfg)
 
-    ds_meta = get_ds_meta(task=task, ds_type="human_raw", split=split)
+    ds_meta = get_ds_meta(task=task, split=split, source="human")
     ds_path = ds_meta["path"]
     
     cfg.task.env_runner.n_train = 0
@@ -152,23 +149,19 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
 @click.option('-c', '--checkpoint', required=True)
 @click.option('-o', '--output_dir', default=None)
 @click.option('-d', '--device', default='cuda:0')
-@click.option('-t', '--tasks', multiple=True, default=DEFAULT_TASKS)
+@click.option('-t', '--task_soup', multiple=True, required=True)
 @click.option('-n', '--num_rollouts', default=30)
-@click.option('-e', '--num_envs', default=10)
+@click.option('-e', '--num_envs', default=5)
 @click.option('-s', '--split', required=True)
 # @click.option('--overwrite', is_flag=True, help='Overwrite existing evals.')
-def main(checkpoint, output_dir, device, tasks, num_rollouts, num_envs, split): #, overwrite):
-    if len(tasks) == 1 and tasks[0] == "atomic_seen":
-        tasks = POST_TRAINING_TASKS["atomic_seen"]
-    elif len(tasks) == 1 and tasks[0] == "composite_seen":
-        tasks = POST_TRAINING_TASKS["composite_seen"]
-    elif len(tasks) == 1 and tasks[0] == "composite_unseen":
-        tasks = POST_TRAINING_TASKS["composite_unseen"]
-    else:
-        tasks = POST_TRAINING_TASKS["atomic_seen"] + POST_TRAINING_TASKS["composite_seen"] + POST_TRAINING_TASKS["composite_unseen"]
+def main(checkpoint, output_dir, device, task_soup, num_rollouts, num_envs, split): #, overwrite):
+    all_tasks = []
+    for task_soup_i in task_soup:
+        all_tasks += TASK_SOUP_REGISTRY[task_soup_i]
+    all_tasks = set(all_tasks)
     
-    for task_i, task in enumerate(tasks):
-        print(colored(f"[{task_i+1}/{len(tasks)}] running evals for {task}", "yellow"))
+    for task_i, task in enumerate(all_tasks):
+        print(colored(f"[{task_i+1}/{len(all_tasks)}] running evals for {task}", "yellow"))
         eval_task(checkpoint, output_dir, device, task, num_rollouts, num_envs, split, overwrite=False)
 
 if __name__ == '__main__':
