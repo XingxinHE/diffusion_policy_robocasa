@@ -2,6 +2,9 @@
 Usage:
 python eval.py --checkpoint data/image/pusht/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt -o data/pusht_eval_output
 """
+import gymnasium as gym
+import robocasa
+from diffusion_policy.common.pytorch_util import dict_apply
 
 import sys
 # use line-buffering for both stdout and stderr
@@ -23,11 +26,12 @@ from termcolor import colored
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 
 from robocasa.utils.dataset_registry import get_ds_meta
-from robocasa.utils.dataset_registry import SINGLE_STAGE_TASK_DATASETS, MULTI_STAGE_TASK_DATASETS, POST_TRAINING_TASKS
+from robocasa.utils.dataset_registry import ATOMIC_TASK_DATASETS, COMPOSITE_TASK_DATASETS, TARGET_TASKS
+from robomimic.utils.lang_utils import LangEncoder
 
 
-ATOMIC_TASKS = list(SINGLE_STAGE_TASK_DATASETS.keys())
-DEFAULT_TASKS = POST_TRAINING_TASKS["atomic"] + POST_TRAINING_TASKS["composite"]
+ATOMIC_TASKS = list(ATOMIC_TASK_DATASETS.keys())
+DEFAULT_TASKS = TARGET_TASKS["atomic_seen"] + TARGET_TASKS["composite_seen"] + TARGET_TASKS["composite_unseen"]
 
 def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs, split, overwrite):
     if base_output_dir is None:
@@ -48,43 +52,11 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
     cfg = payload['cfg']
     cfg = copy.deepcopy(OmegaConf.to_container(cfg))
     cfg["task"]["env_runner"]["env_kwargs"] = {
-        "seed": 1111111,
-        "use_camera_obs": True,
-        "use_object_obs": True,
-        "camera_depths": False,
-        "has_renderer": False,
-        "has_offscreen_renderer": True,
-        "camera_names": ['robot0_agentview_left', 'robot0_agentview_right', 'robot0_eye_in_hand'],
-        "camera_widths": 256,
-        "camera_heights": 256,
-        "ignore_done": True,
-        "reward_shaping": False,
+        "split": split,
     }
-    if split == "train":
-        cfg["task"]["env_runner"]["env_kwargs"].update(
-            obj_instance_split="train",
-            style_ids=-2,
-            layout_ids=-2,
-        )
-    elif split == "test":
-        cfg["task"]["env_runner"]["env_kwargs"].update(
-            obj_instance_split="test",
-            style_ids=None,
-            layout_ids=None,
-            layout_and_style_ids=[[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]],
-            clutter_mode=1,
-        )
-    elif split == "all":
-        cfg["task"]["env_runner"]["env_kwargs"].update(
-            obj_instance_split=None,
-            style_ids=-3,
-            layout_ids=-3,
-        )
-    else:
-        raise ValueError("Invalid split. Choose among train/test/all")
     cfg = OmegaConf.create(cfg)
 
-    ds_meta = get_ds_meta(task=task, ds_type="human_raw", split=split)
+    ds_meta = get_ds_meta(task=task, source="human", split=split)
     ds_path = ds_meta["path"]
     
     cfg.task.env_runner.n_train = 0
@@ -159,13 +131,13 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
 # @click.option('--overwrite', is_flag=True, help='Overwrite existing evals.')
 def main(checkpoint, output_dir, device, tasks, num_rollouts, num_envs, split): #, overwrite):
     if len(tasks) == 1 and tasks[0] == "atomic_seen":
-        tasks = POST_TRAINING_TASKS["atomic_seen"]
+        tasks = TARGET_TASKS["atomic_seen"]
     elif len(tasks) == 1 and tasks[0] == "composite_seen":
-        tasks = POST_TRAINING_TASKS["composite_seen"]
+        tasks = TARGET_TASKS["composite_seen"]
     elif len(tasks) == 1 and tasks[0] == "composite_unseen":
-        tasks = POST_TRAINING_TASKS["composite_unseen"]
+        tasks = TARGET_TASKS["composite_unseen"]
     else:
-        tasks = POST_TRAINING_TASKS["atomic_seen"] + POST_TRAINING_TASKS["composite_seen"] + POST_TRAINING_TASKS["composite_unseen"]
+        tasks = TARGET_TASKS["atomic_seen"] + TARGET_TASKS["composite_seen"] + TARGET_TASKS["composite_unseen"]
     
     for task_i, task in enumerate(tasks):
         print(colored(f"[{task_i+1}/{len(tasks)}] running evals for {task}", "yellow"))

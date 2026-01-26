@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 from robomimic.envs.env_robosuite import EnvRobosuite
 from robomimic.macros import LANG_EMB_KEY
 from robomimic.utils.lang_utils import LangEncoder
+from robomimic.utils.obs_utils import process_frame
 
 class RobomimicImageWrapper(gym.Env):
     def __init__(self, 
@@ -69,10 +70,28 @@ class RobomimicImageWrapper(gym.Env):
             observation_space[key] = this_space
         self.observation_space = observation_space
 
+    def process_obs(self, raw_obs):
+        """
+        Remaps keys from raw observation to keys expected by diffusion policy
+        and performs image processing (normalization + channel reordering)
+        """
+        obs_mappings = self.shape_meta["obs"]
+        policy_obs = {}
+        for policy_key, value in obs_mappings.items():
+            raw_obs_keys = value.get("lerobot_keys", None)
+            if raw_obs_keys is None:
+                continue
+            raw_obs_key = raw_obs_keys[0]
+            policy_obs[policy_key] =  raw_obs[raw_obs_key]
+            if value.get("type", "lowdim") == "rgb":
+                img = policy_obs[policy_key]
+                img_processed = process_frame(img, channel_dim=3, scale=255.)
+                policy_obs[policy_key] = img_processed
+        return policy_obs
 
     def get_observation(self, raw_obs=None):
-        if raw_obs is None:
-            raw_obs = self.env.get_observation()
+        assert raw_obs is not None, "raw_obs must be provided"
+        raw_obs = self.process_obs(raw_obs)
         assert self.lang is not None
         raw_obs[LANG_EMB_KEY] = self.lang_emb
         
@@ -113,16 +132,31 @@ class RobomimicImageWrapper(gym.Env):
         # else:
         #     # random reset
         #     raw_obs = self.env.reset()
-        raw_obs = self.env.reset()
-        self.lang = self.env._ep_lang_str
+        raw_obs, info = self.env.reset()
+        self.lang = raw_obs["annotation.human.task_description"]
         self.lang_emb = self.lang_encoder.get_lang_emb(self.lang).numpy()
 
         # return obs
         obs = self.get_observation(raw_obs)
         return obs
     
+    def convert_action(self, action):
+        """
+        Converts input action (np.array) to format expected by env (dict)
+        """
+        output_action = {
+            "action.end_effector_position": action[0:3],
+            "action.end_effector_rotation": action[3:6],
+            "action.gripper_close": action[6:7],
+            "action.base_motion": action[7:11],
+            "action.control_mode": action[11:12],
+
+        }
+        return output_action
+
     def step(self, action):
-        raw_obs, reward, done, info = self.env.step(action)
+        action_converted = self.convert_action(action)
+        raw_obs, reward, done, truncated, info = self.env.step(action_converted)
         obs = self.get_observation(raw_obs)
         return obs, reward, done, info
     
