@@ -8,6 +8,8 @@ from robomimic.envs.env_robosuite import EnvRobosuite
 from robomimic.macros import LANG_EMB_KEY
 from robomimic.utils.lang_utils import LangEncoder
 from robomimic.utils.obs_utils import process_frame
+from robocasa.utils.env_utils import convert_action
+
 
 class RobomimicImageWrapper(gym.Env):
     def __init__(self, 
@@ -140,22 +142,8 @@ class RobomimicImageWrapper(gym.Env):
         obs = self.get_observation(raw_obs)
         return obs
     
-    def convert_action(self, action):
-        """
-        Converts input action (np.array) to format expected by env (dict)
-        """
-        output_action = {
-            "action.end_effector_position": action[0:3],
-            "action.end_effector_rotation": action[3:6],
-            "action.gripper_close": action[6:7],
-            "action.base_motion": action[7:11],
-            "action.control_mode": action[11:12],
-
-        }
-        return output_action
-
     def step(self, action):
-        action_converted = self.convert_action(action)
+        action_converted = convert_action(action)
         raw_obs, reward, done, truncated, info = self.env.step(action_converted)
         obs = self.get_observation(raw_obs)
         return obs, reward, done, info

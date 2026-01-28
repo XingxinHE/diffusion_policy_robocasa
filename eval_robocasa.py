@@ -49,6 +49,7 @@ def eval_task(checkpoint, base_output_dir, device, task, num_rollouts, num_envs,
     cfg = copy.deepcopy(OmegaConf.to_container(cfg))
     cfg["task"]["env_runner"]["env_kwargs"] = {
         "split": split,
+        "seed": 1111111,
     }
     cfg = OmegaConf.create(cfg)
 
