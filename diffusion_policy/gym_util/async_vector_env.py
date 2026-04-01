@@ -4,7 +4,6 @@ Disabled auto-reset after done
 Added render method.
 """
 
-
 import numpy as np
 import multiprocessing as mp
 import time
@@ -85,7 +84,7 @@ class AsyncVectorEnv(VectorEnv):
         action_space=None,
         shared_memory=True,
         copy=True,
-        context="spawn", # default used to be None
+        context="spawn",  # default used to be None
         daemon=True,
         worker=None,
     ):
@@ -186,7 +185,7 @@ class AsyncVectorEnv(VectorEnv):
         _, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
         self._raise_if_errors(successes)
 
-    def reset_async(self):
+    def reset_async(self, seed=None, options=None):
         self._assert_is_running()
         if self._state != AsyncState.DEFAULT:
             raise AlreadyPendingCallError(
@@ -195,11 +194,28 @@ class AsyncVectorEnv(VectorEnv):
                 self._state.value,
             )
 
+        if options is not None:
+            raise ValueError("AsyncVectorEnv does not support reset options")
+
+        if seed is None:
+            seeds = [None for _ in range(self.num_envs)]
+        elif isinstance(seed, int):
+            seeds = [seed + i for i in range(self.num_envs)]
+        else:
+            seeds = list(seed)
+            if len(seeds) != self.num_envs:
+                raise ValueError(f"Expected {self.num_envs} seeds, got {len(seeds)}")
+
+        for pipe, pipe_seed in zip(self.parent_pipes, seeds):
+            pipe.send(("seed", pipe_seed))
+        _, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
+        self._raise_if_errors(successes)
+
         for pipe in self.parent_pipes:
             pipe.send(("reset", None))
         self._state = AsyncState.WAITING_RESET
 
-    def reset_wait(self, timeout=None):
+    def reset_wait(self, timeout=None, seed=None, options=None):
         """
         Parameters
         ----------
@@ -211,18 +227,21 @@ class AsyncVectorEnv(VectorEnv):
         observations : sample from `observation_space`
             A batch of observations from the vectorized environment.
         """
+        del seed, options
+
         self._assert_is_running()
         if self._state != AsyncState.WAITING_RESET:
             raise NoAsyncCallError(
-                "Calling `reset_wait` without any prior " "call to `reset_async`.",
+                "Calling `reset_wait` without any prior call to `reset_async`.",
                 AsyncState.WAITING_RESET.value,
             )
 
         if not self._poll(timeout):
             self._state = AsyncState.DEFAULT
             raise mp.TimeoutError(
-                "The call to `reset_wait` has timed out after "
-                "{0} second{1}.".format(timeout, "s" if timeout > 1 else "")
+                "The call to `reset_wait` has timed out after {0} second{1}.".format(
+                    timeout, "s" if timeout > 1 else ""
+                )
             )
 
         results, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
@@ -276,15 +295,16 @@ class AsyncVectorEnv(VectorEnv):
         self._assert_is_running()
         if self._state != AsyncState.WAITING_STEP:
             raise NoAsyncCallError(
-                "Calling `step_wait` without any prior call " "to `step_async`.",
+                "Calling `step_wait` without any prior call to `step_async`.",
                 AsyncState.WAITING_STEP.value,
             )
 
         if not self._poll(timeout):
             self._state = AsyncState.DEFAULT
             raise mp.TimeoutError(
-                "The call to `step_wait` has timed out after "
-                "{0} second{1}.".format(timeout, "s" if timeout > 1 else "")
+                "The call to `step_wait` has timed out after {0} second{1}.".format(
+                    timeout, "s" if timeout > 1 else ""
+                )
             )
 
         results, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
@@ -377,8 +397,9 @@ class AsyncVectorEnv(VectorEnv):
     def _assert_is_running(self):
         if self.closed:
             raise ClosedEnvironmentError(
-                "Trying to operate on `{0}`, after a "
-                "call to `close()`.".format(type(self).__name__)
+                "Trying to operate on `{0}`, after a call to `close()`.".format(
+                    type(self).__name__
+                )
             )
 
     def _raise_if_errors(self, successes):
@@ -390,8 +411,9 @@ class AsyncVectorEnv(VectorEnv):
         for _ in range(num_errors):
             index, exctype, value = self.error_queue.get()
             logger.error(
-                "Received the following error from Worker-{0}: "
-                "{1}: {2}".format(index, exctype.__name__, value)
+                "Received the following error from Worker-{0}: {1}: {2}".format(
+                    index, exctype.__name__, value
+                )
             )
             logger.error("Shutting down Worker-{0}.".format(index))
             self.parent_pipes[index].close()
@@ -399,7 +421,7 @@ class AsyncVectorEnv(VectorEnv):
 
         logger.error("Raising the last exception back to the main process.")
         raise exctype(value)
-    
+
     def call_async(self, name: str, *args, **kwargs):
         """Calls the method with name asynchronously and apply args and kwargs to the method.
 
@@ -424,7 +446,7 @@ class AsyncVectorEnv(VectorEnv):
             pipe.send(("_call", (name, args, kwargs)))
         self._state = AsyncState.WAITING_CALL
 
-    def call_wait(self, timeout = None) -> list:
+    def call_wait(self, timeout=None) -> list:
         """Calls all parent pipes and waits for the results.
 
         Args:
@@ -470,12 +492,10 @@ class AsyncVectorEnv(VectorEnv):
         """
         self.call_async(name, *args, **kwargs)
         return self.call_wait()
-    
 
-    def call_each(self, name: str, 
-            args_list: list=None, 
-            kwargs_list: list=None, 
-            timeout = None):
+    def call_each(
+        self, name: str, args_list: list = None, kwargs_list: list = None, timeout=None
+    ):
         n_envs = len(self.parent_pipes)
         if args_list is None:
             args_list = [[]] * n_envs
@@ -518,7 +538,6 @@ class AsyncVectorEnv(VectorEnv):
 
         return results
 
-
     def set_attr(self, name: str, values):
         """Sets an attribute of the sub-environments.
 
@@ -555,8 +574,7 @@ class AsyncVectorEnv(VectorEnv):
         self._raise_if_errors(successes)
 
     def render(self, *args, **kwargs):
-        return self.call('render', *args, **kwargs)
-
+        return self.call("render", *args, **kwargs)
 
 
 def _worker(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
@@ -567,10 +585,19 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
         while True:
             command, data = pipe.recv()
             if command == "reset":
-                observation = env.reset()
+                reset_result = env.reset()
+                if isinstance(reset_result, tuple) and len(reset_result) == 2:
+                    observation, _ = reset_result
+                else:
+                    observation = reset_result
                 pipe.send((observation, True))
             elif command == "step":
-                observation, reward, done, info = env.step(data)
+                step_result = env.step(data)
+                if isinstance(step_result, tuple) and len(step_result) == 5:
+                    observation, reward, terminated, truncated, info = step_result
+                    done = terminated or truncated
+                else:
+                    observation, reward, done, info = step_result
                 # if done:
                 #     observation = env.reset()
                 pipe.send(((observation, reward, done, info), True))
@@ -621,13 +648,22 @@ def _worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_memory, error
         while True:
             command, data = pipe.recv()
             if command == "reset":
-                observation = env.reset()
+                reset_result = env.reset()
+                if isinstance(reset_result, tuple) and len(reset_result) == 2:
+                    observation, _ = reset_result
+                else:
+                    observation = reset_result
                 write_to_shared_memory(
                     index, observation, shared_memory, observation_space
                 )
                 pipe.send((None, True))
             elif command == "step":
-                observation, reward, done, info = env.step(data)
+                step_result = env.step(data)
+                if isinstance(step_result, tuple) and len(step_result) == 5:
+                    observation, reward, terminated, truncated, info = step_result
+                    done = terminated or truncated
+                else:
+                    observation, reward, done, info = step_result
                 # if done:
                 #     observation = env.reset()
                 write_to_shared_memory(

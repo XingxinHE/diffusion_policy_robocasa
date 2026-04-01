@@ -6,41 +6,38 @@ sys.path.append(ROOT_DIR)
 os.chdir(ROOT_DIR)
 
 import zarr
+import pytest
 from diffusion_policy.common.replay_buffer import ReplayBuffer
+
 
 def test():
     import numpy as np
+
     buff = ReplayBuffer.create_empty_numpy()
-    buff.add_episode({
-        'obs': np.zeros((100,10), dtype=np.float16)
-    })
-    buff.add_episode({
-        'obs': np.ones((50,10)),
-        'action': np.ones((50,2))
-    })
+    buff.add_episode({"obs": np.zeros((100, 10), dtype=np.float16)})
+    buff.add_episode({"obs": np.ones((50, 10)), "action": np.ones((50, 2))})
     # buff.rechunk(256)
     obs = buff.get_episode(0)
 
     import numpy as np
+
     buff = ReplayBuffer.create_empty_zarr()
-    buff.add_episode({
-        'obs': np.zeros((100,10), dtype=np.float16)
-    })
-    buff.add_episode({
-        'obs': np.ones((50,10)),
-        'action': np.ones((50,2))
-    })
+    buff.add_episode({"obs": np.zeros((100, 10), dtype=np.float16)})
+    buff.add_episode({"obs": np.ones((50, 10)), "action": np.ones((50, 2))})
     obs = buff.get_episode(0)
-    buff.set_chunks({
-        'obs': (100,10),
-        'action': (100,2)
-    })
+    buff.set_chunks({"obs": (100, 10), "action": (100, 2)})
 
 
 def test_real():
     import os
-    dist_group = zarr.open(
-        os.path.expanduser('~/dev/diffusion_policy/data/pusht/pusht_cchi_v2.zarr'), 'r')
+
+    input_path = os.path.expanduser(
+        "~/dev/diffusion_policy/data/pusht/pusht_cchi_v2.zarr"
+    )
+    if not os.path.exists(input_path):
+        pytest.skip(f"requires local dataset at {input_path}")
+
+    dist_group = zarr.open(input_path, "r")
 
     buff = ReplayBuffer.create_empty_numpy()
     key, group = next(iter(dist_group.items()))
@@ -48,7 +45,7 @@ def test_real():
         buff.add_episode(group)
 
     # out_path = os.path.expanduser('~/dev/diffusion_policy/data/pusht_cchi2_v2_replay.zarr')
-    out_path = os.path.expanduser('~/dev/diffusion_policy/data/test.zarr')
+    out_path = os.path.expanduser("~/dev/diffusion_policy/data/test.zarr")
     out_store = zarr.DirectoryStore(out_path)
     buff.save_to_store(out_store)
 
@@ -57,6 +54,8 @@ def test_real():
 
 
 def test_pop():
-    buff = ReplayBuffer.create_from_path(
-        '/home/chengchi/dev/diffusion_policy/data/pusht_cchi_v3_replay.zarr',
-        mode='rw')
+    replay_path = "/home/chengchi/dev/diffusion_policy/data/pusht_cchi_v3_replay.zarr"
+    if not os.path.exists(replay_path):
+        pytest.skip(f"requires local replay buffer at {replay_path}")
+
+    buff = ReplayBuffer.create_from_path(replay_path, mode="rw")

@@ -14,6 +14,12 @@ cd diffusion_policy
 pip install -e .
 ```
 
+Within `robofab_robocasa`, use the root UV environment instead:
+
+```bash
+uv sync --group diffusion_policy --extra cu128 --frozen
+```
+
 ## Key files
 - Training: [train.py](https://github.com/robocasa-benchmark/diffusion_policy/blob/main/train.py)
 - Evaluation: [eval_robocasa.py](https://github.com/robocasa-benchmark/diffusion_policy/blob/main/eval_robocasa.py)
@@ -21,17 +27,17 @@ pip install -e .
 ## Experiment workflow
 ```
 # train model
-python train.py \
+uv run --group diffusion_policy --extra cu128 python train.py \
 --config-name=train_diffusion_transformer_bs192 \
 task=robocasa/<dataset-soup>
 
 # Evaluate model
-python eval_robocasa.py \
+uv run --group diffusion_policy --extra cu128 python eval_robocasa.py \
 --checkpoint <checkpoint-path> \
 --task_set <task-set> \
 --split <split>
 
 # Report evaluation results
-python diffusion_policy/scripts/get_eval_stats.py \
+uv run --group diffusion_policy --extra cu128 python diffusion_policy/scripts/get_eval_stats.py \
 --dir <outputs-dir>
 ```

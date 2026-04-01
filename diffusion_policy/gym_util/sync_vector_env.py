@@ -70,10 +70,15 @@ class SyncVectorEnv(VectorEnv):
             observation = env.reset()
             observations.append(observation)
         self.observations = concatenate(
-            observations, self.observations, self.single_observation_space
+            self.single_observation_space, observations, self.observations
         )
 
         return deepcopy(self.observations) if self.copy else self.observations
+
+    def reset_async(self, seed=None, options=None):
+        self._pending_reset_seed = seed
+        self._pending_reset_options = options
+        return None
 
     def step_async(self, actions):
         self._actions = actions
@@ -81,13 +86,18 @@ class SyncVectorEnv(VectorEnv):
     def step_wait(self):
         observations, infos = [], []
         for i, (env, action) in enumerate(zip(self.envs, self._actions)):
-            observation, self._rewards[i], self._dones[i], info = env.step(action)
+            step_result = env.step(action)
+            if isinstance(step_result, tuple) and len(step_result) == 5:
+                observation, self._rewards[i], terminated, truncated, info = step_result
+                self._dones[i] = terminated or truncated
+            else:
+                observation, self._rewards[i], self._dones[i], info = step_result
             # if self._dones[i]:
             #     observation = env.reset()
             observations.append(observation)
             infos.append(info)
         self.observations = concatenate(
-            observations, self.observations, self.single_observation_space
+            self.single_observation_space, observations, self.observations
         )
 
         return (
@@ -112,7 +122,7 @@ class SyncVectorEnv(VectorEnv):
             "observation spaces from all environments must be "
             "equal.".format(self.single_observation_space)
         )
-    
+
     def call(self, name, *args, **kwargs) -> tuple:
         """Calls the method with name and applies args and kwargs.
 
@@ -134,9 +144,7 @@ class SyncVectorEnv(VectorEnv):
 
         return tuple(results)
 
-    def call_each(self, name: str, 
-            args_list: list=None, 
-            kwargs_list: list=None):
+    def call_each(self, name: str, args_list: list = None, kwargs_list: list = None):
         n_envs = len(self.envs)
         if args_list is None:
             args_list = [[]] * n_envs
@@ -156,10 +164,9 @@ class SyncVectorEnv(VectorEnv):
 
         return tuple(results)
 
-
     def render(self, *args, **kwargs):
-        return self.call('render', *args, **kwargs)
-    
+        return self.call("render", *args, **kwargs)
+
     def set_attr(self, name: str, values):
         """Sets an attribute of the sub-environments.
 
